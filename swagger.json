@@ -15,13 +15,13 @@
     ],
     "paths": {
         "/parasol": {
+            "x-code-samples":{
+                         "lang": "JavaScript",
+                         "source": "console.log('Hello World');"
+                        },
             "get": {
                 "summary": "Parasol API",
                 "description": "残高照会を確認するためのAPI.\n",
-                "x-code-samples":{
-			  "lang": "JavaScript",
- 			 "source": "console.log('Hello World');"
-			},	
 		"parameters": [
                     {
                         "name": "customerId",
