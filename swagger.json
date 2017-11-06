@@ -2,7 +2,7 @@
     "swagger": "2.0",
     "info": {
         "title": "OpenCanvas APIs",
-        "description": "OpenCanvas APIs",
+        "description": "NTT Data OpenCanvas APIs",
         "version": "1.0.0"
     },
     "host": "opencanvas.org",
