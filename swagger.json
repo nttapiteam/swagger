@@ -18,7 +18,11 @@
             "get": {
                 "summary": "Parasol API",
                 "description": "残高照会を確認するためのAPI.\n",
-                "parameters": [
+                "x-code-samples":{
+			  "lang": "JavaScript",
+ 			 "source": "console.log('Hello World');"
+			},	
+		"parameters": [
                     {
                         "name": "customerId",
                         "in": "query",
