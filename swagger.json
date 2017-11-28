@@ -1,164 +1,2304 @@
 {
-    "swagger": "2.0",
-    "info": {
-        "title": "OpenCanvas APIs",
-        "description": "NTT Data OpenCanvas APIs",
-        "version": "1.0.0"
-    },
-    "host": "opencanvas.org",
-    "schemes": [
-        "https"
-    ],
-    "basePath": "/v1",
-    "produces": [
-        "application/json"
-    ],
-    "paths": {
-        "/parasol": {
-            "x-code-samples":{
-                         "lang": "JavaScript",
-                         "source": "console.log('Hello World');"
-                        },
-            "get": {
-                "summary": "Parasol API",
-                "description": "残高照会を確認するためのAPI.\n",
-		"parameters": [
-                    {
-                        "name": "customerId",
-                        "in": "query",
-                        "description": "顧客IDによる検索.",
-                        "required": true,
-                        "type": "number",
-                        "format": "double"
-                    },
-                    {
-                        "name": "companyId",
-                        "in": "query",
-                        "description": "会社IDによる検索.",
-                        "required": true,
-                        "type": "number",
-                        "format": "double"
-                    }
-                ],
-                "tags": [
-                    "parasol"
-                ],
-                "responses": {
-                    "200": {
-                        "description": "An array of products",
-                        "schema": {
-                            "type": "array",
-                            "items": {
-                                "$ref": "#/definitions/parasol"
-                            }
-                        }
-                    },
-                    "default": {
-                        "description": "Unexpected error",
-                        "schema": {
-                            "$ref": "#/definitions/Error"
-                        }
-                    }
-                }
+  "swagger": "2.0",
+  "info": {
+    "version": "1.0",
+    "title": "AnserParaSOL API(v1)",
+    "description": "本サービスでは、金融機関の設定や利用者の利用状況によって特定の項目の返却値が存在しない場合がある。  \n返却値が存在しない場合、一律Nullを返却する。  \nただし、口座一覧照会、口座情報照会の_links配下の項目は返却値が存在しない場合、項目ごと削除とする。\n"
+  },
+  "basePath": "/parasol/v1",
+  "schemes": [
+    "https"
+  ],
+  "paths": {
+    "/banks/{bank_code}/oauth/auth": {
+      "get": {
+        "tags": [
+          "OAuth"
+        ],
+        "summary": "API連携認証",
+        "description": "利用者に認証・認可を求め、認可の結果を受け取る。",
+        "parameters": [
+          {
+            "$ref": "#/parameters/BankCodePath"
+          },
+          {
+            "in": "query",
+            "name": "response_type",
+            "description": "レスポンスタイプ  \n「code」のみ許可する。\n",
+            "required": true,
+            "type": "string",
+            "enum": [
+              "code"
+            ]
+          },
+          {
+            "in": "query",
+            "name": "client_id",
+            "description": "クライアント識別子  \n",
+            "required": true,
+            "type": "string",
+            "x-format": "英数字",
+            "minLength": 8,
+            "maxLength": 8
+          },
+          {
+            "in": "query",
+            "name": "redirect_uri",
+            "description": "コールバックURL  \n",
+            "required": true,
+            "type": "string",
+            "x-format": "英数字記号",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          {
+            "in": "query",
+            "name": "state",
+            "description": "ステート  \n",
+            "required": false,
+            "type": "string",
+            "x-format": "英数字",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          {
+            "in": "query",
+            "name": "scope",
+            "description": "スコープ  \n複数業務を設定する場合は、半角スペース区切りとする。また、設定値の順序に関係は無い。  \n「personal_transfers」の設定時には「accounts」の設定が必須  \n",
+            "required": false,
+            "type": "string",
+            "x-format": "英数字"
+          }
+        ],
+        "responses": {
+          "302": {
+            "description": "Found",
+            "headers": {
+              "Location": {
+                "description": "利用者が認可した場合は、「 {コールバックURL}?code={認可コード}&state={ステート}」が設定されます。  \n利用者が操作を中止した場合や、なんらかの異常が発生した場合は、「 {コールバックURL}?error={エラーコード}&error_description={エラー内容}&state={ステート}」が設定されます。\n",
+                "type": "string"
+              }
             }
-        },
-        "/bizsol": {
-            "get": {
-                "summary": "Bizsol API",
-                "description": "残高照会API.",
-                "tags": [
-                    "bizsol"
-                ],
-                "responses": {
-                    "200": {
-                        "description": "Profile information for a user",
-                        "schema": {
-                            "$ref": "#/definitions/bizsol"
-                        }
-                    },
-                    "default": {
-                        "description": "Unexpected error",
-                        "schema": {
-                            "$ref": "#/definitions/Error"
-                        }
-                    }
-                }
-            }
+          }
         }
+      }
     },
-    "definitions": {
-        "parasol": {
-            "type": "object",
-            "properties": {
-                "product_id": {
-                    "type": "string",
-                    "description": "Unique identifier representing a specific product for a given latitude & longitude. For example, uberX in San Francisco will have a different product_id than uberX in Los Angeles."
+    "/banks/{bank_code}/oauth/token": {
+      "post": {
+        "tags": [
+          "OAuth"
+        ],
+        "summary": "アクセストークン発行・再発行",
+        "description": "アクセストークンを発行、または再発行する。",
+        "consumes": [
+          "application/x-www-form-urlencoded"
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/parameters/AuthorizationHeaderBasic"
+          },
+          {
+            "$ref": "#/parameters/BankCodePath"
+          },
+          {
+            "in": "formData",
+            "name": "grant_type",
+            "description": "グラントタイプ  \nauthorization_code設定時はアクセストークンを発行し、refresh_token設定時はアクセストークンを再発行する。\n",
+            "required": true,
+            "type": "string",
+            "enum": [
+              "authorization_code",
+              "refresh_token"
+            ]
+          },
+          {
+            "in": "formData",
+            "name": "code",
+            "description": "認可コード  \nグラントタイプにauthorization_code選択時は設定する。refresh_token選択時は設定しない。\n",
+            "required": false,
+            "type": "string",
+            "x-format": "英数字",
+            "minLength": 32,
+            "maxLength": 32
+          },
+          {
+            "in": "formData",
+            "name": "redirect_uri",
+            "description": "コールバックＵＲＬ  \nリダイレクト（認証）電文で指定したコールバックＵＲＬ。  \nグラントタイプにauthorization_code選択時は設定する。refresh_token選択時は設定しない。\n",
+            "required": false,
+            "type": "string",
+            "x-format": "英数字記号",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          {
+            "in": "formData",
+            "name": "access_token",
+            "description": "アクセストークン  \nグラントタイプにrefresh_token選択時は設定する。authorization_code選択時は設定しない。\n",
+            "required": false,
+            "type": "string",
+            "x-format": "英数字",
+            "minLength": 32,
+            "maxLength": 32
+          },
+          {
+            "in": "formData",
+            "name": "refresh_token",
+            "description": "リフレッシュトークン  \nグラントタイプにrefresh_token選択時は設定する。authorization_code選択時は設定しない。\n",
+            "required": false,
+            "type": "string",
+            "x-format": "英数字",
+            "minLength": 32,
+            "maxLength": 32
+          },
+          {
+            "in": "formData",
+            "name": "auto_manual_mode",
+            "description": "自動手動モード  \nauto=自動 manual=手動  \nグラントタイプにrefresh_token選択時は設定する。authorization_code選択時は設定しない。  \n利用者操作契機による要求には「手動」、それ以外の契機の場合は「自動」を設定する。  \n",
+            "required": true,
+            "type": "string",
+            "enum": [
+              "auto",
+              "manual"
+            ]
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "access_token": {
+                  "type": "string",
+                  "example": "7d0e8fddb23a40a2b5f73c2771e9c4c7",
+                  "description": "アクセストークン  \n",
+                  "x-nullable": false,
+                  "x-format": "英数字",
+                  "minLength": 32,
+                  "maxLength": 32
                 },
-                "description": {
-                    "type": "string",
-                    "description": "Description of product."
+                "token_type": {
+                  "type": "string",
+                  "example": "Bearer",
+                  "description": "トークンタイプ  \n「Bearer」のみ設定する。\n",
+                  "enum": [
+                    "Bearer"
+                  ],
+                  "x-nullable": false
                 },
-                "display_name": {
-                    "type": "string",
-                    "description": "Display name of product."
+                "expires_in": {
+                  "type": "integer",
+                  "example": 3600,
+                  "description": "アクセストークン有効期間  \n秒数を設定する。  \n",
+                  "x-nullable": false,
+                  "minLength": 1,
+                  "maxLength": 5
                 },
-                "capacity": {
-                    "type": "string",
-                    "description": "Capacity of product. For example, 4 people."
+                "refresh_token": {
+                  "type": "string",
+                  "example": "ca5723130d3042eea0a6e6b7a97d0455",
+                  "description": "リフレッシュトークン\n",
+                  "x-nullable": false,
+                  "x-format": "英数字",
+                  "minLength": 32,
+                  "maxLength": 32
                 },
-                "image": {
-                    "type": "string",
-                    "description": "Image URL representing the product."
+                "user_id": {
+                  "type": "string",
+                  "example": "99999901",
+                  "description": "契約者通番  \nAnserParaSOLにおいて利用者を一意に識別する番号  \nグラントタイプにauthorization_codeを選択した時のみ含まれる。  \n金融機関やAnserParaSOLへ問い合わせる際に利用する。\n",
+                  "x-nullable": true,
+                  "x-format": "数字",
+                  "minLength": 1,
+                  "maxLength": 8
+                },
+                "refresh_token_limit_date": {
+                  "type": "string",
+                  "format": "date",
+                  "example": "2015-12-12",
+                  "description": "リフレッシュトークン有効期限  \nグラントタイプにauthorization_codeを選択した時のみ含まれる。\n",
+                  "x-nullable": true,
+                  "minLength": 1,
+                  "maxLength": 10
+                },
+                "scope": {
+                  "type": "string",
+                  "example": "accounts",
+                  "description": "スコープ  \n複数業務を設定されている場合は、半角スペース区切りとする。また、設定値の順序に関係は無い。  \n認可時にスコープを指定しなかった場合は、「accounts」が設定される。  \n",
+                  "x-nullable": false
                 }
+              }
             }
-        },
-        "bizsol": {
-            "type": "object",
-            "properties": {
-                "product_id": {
-                    "type": "string",
-                    "description": "Unique identifier representing a specific product for a given latitude & longitude. For example, uberX in San Francisco will have a different product_id than uberX in Los Angeles"
+          },
+          "400": {
+            "$ref": "#/responses/OAuthAPIErrorResponse"
+          },
+          "401": {
+            "$ref": "#/responses/OAuthAPIErrorWithWWWAuthenticateHeaderResponse"
+          },
+          "403": {
+            "$ref": "#/responses/OAuthAPIErrorResponse"
+          },
+          "500": {
+            "$ref": "#/responses/OAuthAPIErrorResponse"
+          }
+        }
+      }
+    },
+    "/banks/{bank_code}/oauth/revoke": {
+      "post": {
+        "summary": "トークン失効",
+        "description": "トークンを失効させる。  \n削除対象のトークンがアクセストークンである場合、契約者に紐付くリフレッシュトークンも無効にする。　　\n削除対象のトークンがリフレッシュトークンである場合、契約者に紐付くアクセストークンも無効にする。　　\n",
+        "tags": [
+          "OAuth"
+        ],
+        "consumes": [
+          "application/x-www-form-urlencoded"
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/parameters/AuthorizationHeaderBasic"
+          },
+          {
+            "$ref": "#/parameters/BankCodePath"
+          },
+          {
+            "in": "formData",
+            "name": "token",
+            "description": "トークン  \n削除対象のアクセストークンもしくはリフレッシュトークンを設定する。\n",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "400": {
+            "$ref": "#/responses/OAuthAPIErrorResponse"
+          },
+          "401": {
+            "$ref": "#/responses/OAuthAPIErrorWithWWWAuthenticateHeaderResponse"
+          },
+          "403": {
+            "$ref": "#/responses/OAuthAPIErrorResponse"
+          },
+          "500": {
+            "$ref": "#/responses/OAuthAPIErrorResponse"
+          }
+        }
+      }
+    },
+    "/banks/{bank_code}/accounts": {
+      "get": {
+        "tags": [
+          "accounts"
+        ],
+        "summary": "口座一覧照会",
+        "description": "契約者が保有する口座情報を照会する。  \n保有する投信口座の情報取得時に、エラーが発生した場合には、レスポンスのトップレベルにエラー情報を設定する。取得成功した投信口座以外の口座情報を正常レスポンスを返却する。  \n口座の残高情報のみ取得できない場合には、対象口座にエラー情報を設定し正常レスポンスを返却する。  \n",
+        "produces": [
+          "application/json",
+          "application/problem+json"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/parameters/AuthorizationHeaderBearer"
+          },
+          {
+            "$ref": "#/parameters/BankCodePath"
+          },
+          {
+            "$ref": "#/parameters/AutoManualModeQuery"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "count": {
+                  "type": "integer",
+                  "example": 10,
+                  "description": "口座数  \n",
+                  "x-nullable": false,
+                  "minLength": 1,
+                  "maxLength": 3
+                },
+                "accounts": {
+                  "type": "array",
+                  "description": "口座情報  \n対象の口座が存在しない場合、空のリストを返却する。\n",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "account_id": {
+                        "type": "string",
+                        "example": "p-12345678-y-1234",
+                        "description": "口座識別子  \n",
+                        "x-nullable": false,
+                        "x-format": "英数字記号",
+                        "minLength": 7,
+                        "maxLength": 29
+                      },
+                      "account_name": {
+                        "type": "string",
+                        "example": "三田支店　普通",
+                        "description": "口座名  \n支店名と科目名をスペース区切りで結合し設定する。\n",
+                        "x-nullable": false,
+                        "x-format": "半角全角",
+                        "minLength": 3,
+                        "maxLength": 41
+                      },
+                      "branch_code": {
+                        "type": "string",
+                        "example": "115",
+                        "description": "支店コード  \n",
+                        "x-nullable": false,
+                        "x-format": "数字",
+                        "minLength": 3,
+                        "maxLength": 5
+                      },
+                      "branch_name": {
+                        "type": "string",
+                        "example": "東京本店",
+                        "description": "支店名  \n",
+                        "x-nullable": false,
+                        "x-format": "半角全角",
+                        "minLength": 1,
+                        "maxLength": 30
+                      },
+                      "account_type_code": {
+                        "type": "string",
+                        "example": "1",
+                        "description": "科目コード  \n",
+                        "x-nullable": true,
+                        "x-format": "英数字",
+                        "minLength": 1,
+                        "maxLength": 1
+                      },
+                      "account_type": {
+                        "type": "string",
+                        "example": "普通",
+                        "description": "科目名  \n",
+                        "x-nullable": false,
+                        "x-format": "全角",
+                        "minLength": 1,
+                        "maxLength": 10
+                      },
+                      "account_number": {
+                        "type": "string",
+                        "example": "1100001",
+                        "description": "口座番号  \n",
+                        "x-nullable": false,
+                        "x-format": "数字",
+                        "minLength": 1,
+                        "maxLength": 10
+                      },
+                      "account_branch_number": {
+                        "type": "string",
+                        "example": "0",
+                        "description": "口座枝番  \n該当する口座が外貨口座の場合、口座枝番を設定する。  \n外貨口座以外の場合、Nullを設定する。\n",
+                        "x-nullable": true,
+                        "x-format": "数字",
+                        "minLength": 1,
+                        "maxLength": 5
+                      },
+                      "specific_account_division": {
+                        "type": "string",
+                        "example": "general",
+                        "description": "特定口座区分  \n該当する口座が投信口座の場合、特定口座区分を設定する。  \ngeneral=一般 specific=特定  \n投信口座以外の場合、Nullを設定する。\n",
+                        "enum": [
+                          "general",
+                          "specific"
+                        ],
+                        "x-nullable": true
+                      },
+                      "withholding_tax_division": {
+                        "type": "string",
+                        "example": "none",
+                        "description": "源泉徴収区分  \n該当する口座が投信口座の場合、源泉徴収区分を設定する。  \nnone=源泉徴収選択なし includeDiviends=源泉徴収選択あり（配当通算あり） excludeDiviends=源泉徴収選択あり（配当通算なし）  \n投信口座以外の場合、Nullを設定する。\n",
+                        "enum": [
+                          "none",
+                          "includeDiviends",
+                          "excludeDiviends"
+                        ],
+                        "x-nullable": true
+                      },
+                      "currency_code": {
+                        "type": "string",
+                        "example": "USD",
+                        "description": "通貨コード  \nISO4217で規定されているコードを設定する。\n",
+                        "x-nullable": false,
+                        "x-format": "英字",
+                        "minLength": 3,
+                        "maxLength": 3
+                      },
+                      "tts": {
+                        "type": "number",
+                        "example": 105.85,
+                        "description": "預入適用レート  \n預入適用レート（TTS）を設定する。\n外貨口座以外の場合、Nullを設定する。\n",
+                        "x-nullable": true,
+                        "minLength": 1,
+                        "maxLength": 11
+                      },
+                      "ttb": {
+                        "type": "number",
+                        "example": 100.55,
+                        "description": "払出適用レート  \n払出適用レート(TTB)を設定する。  \n外貨口座以外の場合、Nullを設定する。\n",
+                        "x-nullable": true,
+                        "minLength": 1,
+                        "maxLength": 11
+                      },
+                      "ttm": {
+                        "type": "number",
+                        "example": 100.45,
+                        "description": "仲値  \n仲値(TTM)を設定する。  \n外貨口座以外の場合、Nullを設定する。\n",
+                        "x-nullable": true,
+                        "minLength": 1,
+                        "maxLength": 11
+                      },
+                      "rate_base_date": {
+                        "type": "string",
+                        "format": "date",
+                        "example": "2015-01-01",
+                        "description": "外貨レート基準日\nレートの設定日を設定する。\n外貨口座以外の場合、Nullを設定する。\n",
+                        "x-nullable": true,
+                        "minLength": 10,
+                        "maxLength": 10
+                      },
+                      "rate_base_time": {
+                        "type": "string",
+                        "example": "12:20+09:00",
+                        "description": "外貨レート基準時刻    \nレートの設定時刻をhh:mm+09:00の形式で時刻を返却する。  \n外貨口座以外の場合、Nullを設定する。\n",
+                        "x-nullable": true,
+                        "x-format": "英数字記号",
+                        "minLength": 11,
+                        "maxLength": 11
+                      },
+                      "current_balance_title": {
+                        "type": "string",
+                        "example": "預金残高",
+                        "description": "預金残高タイトル  \n",
+                        "x-nullable": true,
+                        "x-format": "全角",
+                        "minLength": 1,
+                        "maxLength": 4
+                      },
+                      "current_balance": {
+                        "type": "number",
+                        "example": 22000000,
+                        "description": "預金残高  \n",
+                        "x-nullable": true,
+                        "minLength": 1,
+                        "maxLength": 18
+                      },
+                      "breakdown_title": {
+                        "type": "string",
+                        "example": "お引き出し可能金額",
+                        "description": "内訳タイトル  \n",
+                        "x-nullable": true,
+                        "x-format": "全角",
+                        "minLength": 1,
+                        "maxLength": 8
+                      },
+                      "breakdown_amount": {
+                        "type": "number",
+                        "example": 22000000,
+                        "description": "内訳金額  \n",
+                        "x-nullable": true,
+                        "minLength": 1,
+                        "maxLength": 15
+                      },
+                      "previous_day_balance_title": {
+                        "type": "string",
+                        "example": "預金残高",
+                        "description": "前日残高タイトル  \n",
+                        "x-nullable": true,
+                        "x-format": "全角",
+                        "minLength": 1,
+                        "maxLength": 11
+                      },
+                      "previous_day_balance": {
+                        "type": "number",
+                        "example": 20000000,
+                        "description": "前日残高  \n",
+                        "x-nullable": true,
+                        "minLength": 1,
+                        "maxLength": 15
+                      },
+                      "previous_month_balance_title": {
+                        "type": "string",
+                        "example": "融資残高",
+                        "description": "前月末残高タイトル  \n",
+                        "x-nullable": true,
+                        "x-format": "全角",
+                        "minLength": 1,
+                        "maxLength": 10
+                      },
+                      "previous_month_balance": {
+                        "type": "number",
+                        "example": 12000000,
+                        "description": "前月末残高  \n",
+                        "x-nullable": true,
+                        "minLength": 1,
+                        "maxLength": 15
+                      },
+                      "stage_name": {
+                        "type": "string",
+                        "example": "XXXステージ",
+                        "description": "ステージ名  \n",
+                        "x-nullable": true,
+                        "x-format": "全角",
+                        "minLength": 1,
+                        "maxLength": 16
+                      },
+                      "point": {
+                        "type": "integer",
+                        "example": 0,
+                        "description": "ポイント  \n",
+                        "x-nullable": true,
+                        "minLength": 1,
+                        "maxLength": 15
+                      },
+                      "interest_rate": {
+                        "type": "number",
+                        "example": 0.002,
+                        "description": "金利  \n",
+                        "x-nullable": true,
+                        "minLength": 1,
+                        "maxLength": 8
+                      },
+                      "base_date": {
+                        "type": "string",
+                        "format": "date",
+                        "example": "2015-01-01",
+                        "description": "基準日\n",
+                        "x-nullable": true,
+                        "minLength": 10,
+                        "maxLength": 10
+                      },
+                      "base_time": {
+                        "type": "string",
+                        "example": "12:20+09:00",
+                        "description": "基準時刻  \nhh:mm+09:00の形式で時刻を返却する。  \n投信口座の場合、Nullを返却する。\n",
+                        "x-nullable": true,
+                        "x-format": "英数字記号",
+                        "minLength": 11,
+                        "maxLength": 11
+                      },
+                      "transaction_date_from_online": {
+                        "type": "string",
+                        "format": "date",
+                        "example": "2017-03-01",
+                        "description": "オンライン照会方式照会可能開始日\nオンライン方式で取得可能な入出金取引明細範囲指定開始日付をYYYY-MM-DD形式で設定する。\n",
+                        "x-nullable": true,
+                        "minLength": 10,
+                        "maxLength": 10
+                      },
+                      "transaction_date_from_offline": {
+                        "type": "string",
+                        "format": "date",
+                        "example": "2016-03-01",
+                        "description": "オフライン照会方式照会可能開始日\nオフライン方式で取得可能な入出金取引明細範囲指定開始日付をYYYY-MM-DD形式で設定する。\n",
+                        "x-nullable": true,
+                        "minLength": 10,
+                        "maxLength": 10
+                      },
+                      "_links": {
+                        "type": "object",
+                        "properties": {
+                          "self": {
+                            "type": "object",
+                            "properties": {
+                              "href": {
+                                "type": "string",
+                                "description": "口座情報照会  \n口座情報照会が実行可能な口座の場合、口座情報照会のuriを設定する。\n"
+                              }
+                            }
+                          },
+                          "transactions": {
+                            "type": "object",
+                            "properties": {
+                              "href": {
+                                "type": "string",
+                                "description": "入出金取引明細照会　　\n入出金取引明細照会が実行可能な口座の場合、入出金取引明細照会のuriを設定する。\n"
+                              }
+                            }
+                          },
+                          "term_deposits": {
+                            "type": "object",
+                            "properties": {
+                              "href": {
+                                "type": "string",
+                                "description": "定期保有明細照会　　\n定期保有明細照会が実行可能な口座の場合、定期保有明細照会のuriを設定する。\n"
+                              }
+                            }
+                          },
+                          "funds": {
+                            "type": "object",
+                            "properties": {
+                              "href": {
+                                "type": "string",
+                                "description": "投信保有明細照会　　\n投信保有明細照会が実行可能な口座の場合、投信保有明細照会のuriを設定する。\n"
+                              }
+                            }
+                          },
+                          "personal_transfers": {
+                            "type": "object",
+                            "properties": {
+                              "href": {
+                                "type": "string",
+                                "description": "振替実行　　\n振替実行が実行可能な口座の場合、振替実行のuriを設定する。\n"
+                              }
+                            }
+                          }
+                        }
+                      },
+                      "error": {
+                        "type": "string",
+                        "example": "access_denied",
+                        "description": "エラーコード  \n対応する口座の残高が取得できない場合、エラーコードを設定する。  \n",
+                        "x-nullable": true,
+                        "x-format": "英数字",
+                        "minLength": 1,
+                        "maxLength": 256
+                      },
+                      "error_description": {
+                        "type": "string",
+                        "example": "congestion occurring.",
+                        "description": "エラーメッセージ  \n対応する口座の残高が取得できない場合、エラーメッセージを設定する。  \n",
+                        "x-nullable": true,
+                        "x-format": "英数字",
+                        "minLength": 1,
+                        "maxLength": 256
+                      }
+                    }
+                  }
+                },
+                "errors": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "error": {
+                        "type": "string",
+                        "example": "access_denied",
+                        "description": "エラーコード  \n特定業務が利用できない場合、エラーコードを設定する。  \n",
+                        "x-nullable": true,
+                        "x-format": "英数字",
+                        "minLength": 1,
+                        "maxLength": 256
+                      },
+                      "error_description": {
+                        "type": "string",
+                        "example": "congestion occurring.",
+                        "description": "エラーメッセージ  \n特定業務が利用できない場合、エラーメッセージを設定する。  \n",
+                        "x-nullable": true,
+                        "x-format": "英数字",
+                        "minLength": 1,
+                        "maxLength": 256
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/responses/BusinessAPIBusinessErrorResponse"
+          },
+          "401": {
+            "$ref": "#/responses/BusinessAPITokenErrorResponse"
+          },
+          "403": {
+            "$ref": "#/responses/BusinessAPITokenErrorResponse"
+          },
+          "500": {
+            "$ref": "#/responses/BusinessAPIBusinessErrorResponse"
+          }
+        }
+      }
+    },
+    "/banks/{bank_code}/accounts/{account_id}": {
+      "get": {
+        "tags": [
+          "accounts"
+        ],
+        "summary": "口座情報照会",
+        "description": "指定した口座の口座情報を照会する。  \n本APIは口座一覧照会と同等の情報返却するため、同一のJSON構造でレスポンスを返却する。\n",
+        "produces": [
+          "application/json",
+          "application/problem+json"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/parameters/AuthorizationHeaderBearer"
+          },
+          {
+            "$ref": "#/parameters/BankCodePath"
+          },
+          {
+            "$ref": "#/parameters/AccountIdPath"
+          },
+          {
+            "in": "query",
+            "name": "query_method",
+            "description": "照会方式  \n残高の照会方式を設定する。  \nonline=リアルタイムの情報を照会 offline=AnserParaSOLにて保管している情報を照会  \n外貨口座、投信口座については、リアルタイムでの残高情報を取得できないためオンライン方式を指定できない。  \n本パラメータを設定しない場合は、AnserParaSOLにてサービス時間を確認し、照会可能な方式で情報を取得する。\n",
+            "required": false,
+            "type": "string",
+            "enum": [
+              "online",
+              "offline"
+            ]
+          },
+          {
+            "$ref": "#/parameters/AutoManualModeQuery"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "count": {
+                  "type": "integer",
+                  "example": 1,
+                  "description": "口座数  \n取得した口座数を設定する。本APIでは1を返却する。\n",
+                  "enum": [
+                    1
+                  ],
+                  "x-nullable": false
+                },
+                "accounts": {
+                  "type": "array",
+                  "description": "口座情報  \n",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "account_id": {
+                        "type": "string",
+                        "example": "p-12345678-y-1234",
+                        "description": "口座識別子  \n",
+                        "x-nullable": false,
+                        "x-format": "英数字記号",
+                        "minLength": 7,
+                        "maxLength": 29
+                      },
+                      "account_name": {
+                        "type": "string",
+                        "example": "三田支店　普通",
+                        "description": "口座名  \n支店名と科目名をスペース区切りで結合し設定する。\n",
+                        "x-nullable": false,
+                        "x-format": "半角全角",
+                        "minLength": 3,
+                        "maxLength": 41
+                      },
+                      "branch_code": {
+                        "type": "string",
+                        "example": "115",
+                        "description": "支店コード  \n",
+                        "x-nullable": false,
+                        "x-format": "数字",
+                        "minLength": 3,
+                        "maxLength": 5
+                      },
+                      "branch_name": {
+                        "type": "string",
+                        "example": "東京本店",
+                        "description": "支店名  \n",
+                        "x-nullable": false,
+                        "x-format": "半角全角",
+                        "minLength": 1,
+                        "maxLength": 30
+                      },
+                      "account_type_code": {
+                        "type": "string",
+                        "example": "1",
+                        "description": "科目コード  \n",
+                        "x-nullable": true,
+                        "x-format": "英数字",
+                        "minLength": 1,
+                        "maxLength": 1
+                      },
+                      "account_type": {
+                        "type": "string",
+                        "example": "普通",
+                        "description": "科目名  \n",
+                        "x-nullable": false,
+                        "x-format": "全角",
+                        "minLength": 1,
+                        "maxLength": 10
+                      },
+                      "account_number": {
+                        "type": "string",
+                        "example": "1100001",
+                        "description": "口座番号  \n",
+                        "x-nullable": false,
+                        "x-format": "数字",
+                        "minLength": 1,
+                        "maxLength": 10
+                      },
+                      "account_branch_number": {
+                        "type": "string",
+                        "example": "0",
+                        "description": "口座枝番  \n該当する口座が外貨口座の場合、口座枝番を設定する。  \n外貨口座以外の場合、Nullを設定する。\n",
+                        "x-nullable": true,
+                        "x-format": "数字",
+                        "minLength": 1,
+                        "maxLength": 5
+                      },
+                      "specific_account_division": {
+                        "type": "string",
+                        "example": "general",
+                        "description": "特定口座区分  \n該当する口座が投信口座の場合、特定口座区分を設定する。  \ngeneral=一般 specific=特定  \n投信口座以外の場合、Nullを設定する。\n",
+                        "enum": [
+                          "general",
+                          "specific"
+                        ],
+                        "x-nullable": true
+                      },
+                      "withholding_tax_division": {
+                        "type": "string",
+                        "example": "none",
+                        "description": "源泉徴収区分  \n該当する口座が投信口座の場合、源泉徴収区分を設定する。  \nnone=源泉徴収選択なし includeDiviends=源泉徴収選択あり（配当通算あり） excludeDiviends=源泉徴収選択あり（配当通算なし）  \n投信口座以外の場合、Nullを設定する。\n",
+                        "enum": [
+                          "none",
+                          "includeDiviends",
+                          "excludeDiviends"
+                        ],
+                        "x-nullable": true
+                      },
+                      "currency_code": {
+                        "type": "string",
+                        "example": "USD",
+                        "description": "通貨コード  \nISO4217で規定されているコードを設定する。\n",
+                        "x-nullable": false,
+                        "x-format": "英字",
+                        "minLength": 1,
+                        "maxLength": 5
+                      },
+                      "tts": {
+                        "type": "number",
+                        "example": 105.85,
+                        "description": "預入適用レート  \n預入適用レート（TTS）を設定する。\n外貨口座以外の場合、Nullを設定する。\n",
+                        "x-nullable": true,
+                        "minLength": 1,
+                        "maxLength": 11
+                      },
+                      "ttb": {
+                        "type": "number",
+                        "example": 100.55,
+                        "description": "払出適用レート  \n払出適用レート(TTB)を設定する。  \n外貨口座以外の場合、Nullを設定する。\n",
+                        "x-nullable": true,
+                        "minLength": 1,
+                        "maxLength": 11
+                      },
+                      "ttm": {
+                        "type": "number",
+                        "x-format": "数字記号",
+                        "example": 100.45,
+                        "description": "仲値  \n仲値(TTM)を設定する。  \n外貨口座以外の場合、Nullを設定する。\n",
+                        "x-nullable": true,
+                        "minLength": 1,
+                        "maxLength": 11
+                      },
+                      "rate_base_date": {
+                        "type": "string",
+                        "format": "date",
+                        "example": "2015-01-01",
+                        "description": "外貨レート基準日\n外貨口座以外の場合、Nullを設定する。\n",
+                        "x-nullable": true,
+                        "minLength": 10,
+                        "maxLength": 10
+                      },
+                      "rate_base_time": {
+                        "type": "string",
+                        "example": "12:20+09:00",
+                        "description": "外貨レート基準時刻    \nレートの設定時刻をhh:mm+09:00の形式で時刻を返却する。  \n外貨口座以外の場合、Nullを設定する。\n",
+                        "x-nullable": true,
+                        "x-format": "英数字記号",
+                        "minLength": 11,
+                        "maxLength": 11
+                      },
+                      "current_balance_title": {
+                        "type": "string",
+                        "example": "預金残高",
+                        "description": "預金残高タイトル  \n",
+                        "x-nullable": true,
+                        "x-format": "全角",
+                        "minLength": 1,
+                        "maxLength": 4
+                      },
+                      "current_balance": {
+                        "type": "number",
+                        "example": 22000000,
+                        "description": "預金残高  \n",
+                        "x-nullable": true,
+                        "minLength": 1,
+                        "maxLength": 18
+                      },
+                      "breakdown_title": {
+                        "type": "string",
+                        "example": "お引き出し可能金額",
+                        "description": "内訳タイトル  \n",
+                        "x-nullable": true,
+                        "x-format": "全角",
+                        "minLength": 1,
+                        "maxLength": 8
+                      },
+                      "breakdown_amount": {
+                        "type": "number",
+                        "example": 22000000,
+                        "description": "内訳金額  \n",
+                        "x-nullable": true,
+                        "minLength": 1,
+                        "maxLength": 15
+                      },
+                      "previous_day_balance_title": {
+                        "type": "string",
+                        "example": "預金残高",
+                        "description": "前日残高タイトル  \n",
+                        "x-nullable": true,
+                        "x-format": "全角",
+                        "minLength": 1,
+                        "maxLength": 11
+                      },
+                      "previous_day_balance": {
+                        "type": "number",
+                        "example": 20000000,
+                        "description": "前日残高  \n",
+                        "x-nullable": true,
+                        "minLength": 1,
+                        "maxLength": 15
+                      },
+                      "previous_month_balance_title": {
+                        "type": "string",
+                        "example": "融資残高",
+                        "description": "前月末残高タイトル  \n",
+                        "x-nullable": true,
+                        "x-format": "全角",
+                        "minLength": 1,
+                        "maxLength": 10
+                      },
+                      "previous_month_balance": {
+                        "type": "number",
+                        "example": 12000000,
+                        "description": "前月末残高  \n",
+                        "x-nullable": true,
+                        "minLength": 1,
+                        "maxLength": 15
+                      },
+                      "stage_name": {
+                        "type": "string",
+                        "example": "XXXステージ",
+                        "description": "ステージ名  \n",
+                        "x-nullable": true,
+                        "x-format": "全角",
+                        "minLength": 1,
+                        "maxLength": 16
+                      },
+                      "point": {
+                        "type": "integer",
+                        "example": 0,
+                        "description": "ポイント  \n",
+                        "x-nullable": true,
+                        "minLength": 1,
+                        "maxLength": 15
+                      },
+                      "interest_rate": {
+                        "type": "number",
+                        "example": 0.002,
+                        "description": "金利  \n",
+                        "x-nullable": true,
+                        "minLength": 1,
+                        "maxLength": 8
+                      },
+                      "base_date": {
+                        "type": "string",
+                        "format": "date",
+                        "example": "2015-01-01",
+                        "description": "基準日\n",
+                        "x-nullable": true,
+                        "minLength": 10,
+                        "maxLength": 10
+                      },
+                      "base_time": {
+                        "type": "string",
+                        "example": "12:20+09:00",
+                        "description": "基準時刻  \nhh:mm+09:00の形式で時刻を返却する。  \n投信口座の場合、Nullを返却する。\n",
+                        "x-nullable": true,
+                        "x-format": "英数字記号",
+                        "minLength": 11,
+                        "maxLength": 11
+                      },
+                      "_links": {
+                        "type": "object",
+                        "properties": {
+                          "self": {
+                            "type": "object",
+                            "properties": {
+                              "href": {
+                                "type": "string",
+                                "description": "口座情報照会  \n口座情報照会が実行可能な口座の場合、口座情報照会のuriを設定する。\n"
+                              }
+                            }
+                          },
+                          "transactions": {
+                            "type": "object",
+                            "properties": {
+                              "href": {
+                                "type": "string",
+                                "description": "入出金取引明細照会　　\n入出金取引明細照会が実行可能な口座の場合、入出金取引明細照会のuriを設定する。\n"
+                              }
+                            }
+                          },
+                          "term_deposits": {
+                            "type": "object",
+                            "properties": {
+                              "href": {
+                                "type": "string",
+                                "description": "定期保有明細照会　　\n定期保有明細照会が実行可能な口座の場合、定期保有明細照会のuriを設定する。\n"
+                              }
+                            }
+                          },
+                          "funds": {
+                            "type": "object",
+                            "properties": {
+                              "href": {
+                                "type": "string",
+                                "description": "投信保有明細照会　　\n投信保有明細照会が実行可能な口座の場合、投信保有明細照会のuriを設定する。\n"
+                              }
+                            }
+                          },
+                          "personal_transfers": {
+                            "type": "object",
+                            "properties": {
+                              "href": {
+                                "type": "string",
+                                "description": "振替実行　　\n振替実行が実行可能な口座の場合、振替実行のuriを設定する。\n"
+                              }
+                            }
+                          }
+                        }
+                      },
+                      "error": {
+                        "type": "string",
+                        "example": "access_denied",
+                        "description": "エラーコード  \n対応する口座の残高が取得できない場合、エラーコードを設定する。  \n本APIではNullを返却する。\n",
+                        "enum": [
+                          null
+                        ],
+                        "x-nullable": true
+                      },
+                      "error_description": {
+                        "type": "string",
+                        "example": "congestion occurring.",
+                        "description": "エラーメッセージ  \n対応する口座の残高が取得できない場合、エラーメッセージを設定する。\n本APIではNullを返却する。\n",
+                        "enum": [
+                          null
+                        ],
+                        "x-nullable": true
+                      }
+                    }
+                  }
+                },
+                "errors": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "error": {
+                        "type": "string",
+                        "example": "access_denied",
+                        "description": "エラーコード  \n特定業務が閉塞している場合、エラーコードを設定する。\n本APIではNullを返却する。\n",
+                        "enum": [
+                          null
+                        ],
+                        "x-nullable": true
+                      },
+                      "error_description": {
+                        "type": "string",
+                        "example": "system blocked.",
+                        "description": "エラーメッセージ  \n特定業務が閉塞している場合、エラーメッセージを設定する。\n本APIではNullを返却する。\n",
+                        "enum": [
+                          null
+                        ],
+                        "x-nullable": true
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/responses/BusinessAPIBusinessErrorResponse"
+          },
+          "401": {
+            "$ref": "#/responses/BusinessAPITokenErrorResponse"
+          },
+          "403": {
+            "$ref": "#/responses/BusinessAPITokenErrorResponse"
+          },
+          "404": {
+            "$ref": "#/responses/BusinessAPIBusinessErrorResponse"
+          },
+          "500": {
+            "$ref": "#/responses/BusinessAPIBusinessErrorResponse"
+          }
+        }
+      }
+    },
+    "/banks/{bank_code}/accounts/{account_id}/transactions": {
+      "get": {
+        "tags": [
+          "accounts"
+        ],
+        "summary": "入出金取引明細照会",
+        "description": "指定した口座の入出金取引明細を照会する。",
+        "produces": [
+          "application/json",
+          "application/problem+json"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/parameters/AuthorizationHeaderBearer"
+          },
+          {
+            "$ref": "#/parameters/BankCodePath"
+          },
+          {
+            "$ref": "#/parameters/AccountIdPath"
+          },
+          {
+            "in": "query",
+            "name": "query_method",
+            "description": "照会方式  \n取引明細の照会方式を設定する。  \nonline=リアルタイムの情報を照会 offline=AnserParaSOLにて保管している情報を照会  \n外貨口座、投信口座については、リアルタイムでの残高情報を取得できないためオンライン方式を指定できない。  \n本パラメータを設定しない場合は、AnserParaSOLにてサービス時間を確認し、照会可能な方式で情報を取得する。\n",
+            "required": false,
+            "type": "string",
+            "enum": [
+              "online",
+              "offline"
+            ]
+          },
+          {
+            "$ref": "#/parameters/AutoManualModeQuery"
+          },
+          {
+            "in": "query",
+            "name": "date_from",
+            "description": "入出金取引明細範囲指定開始日付\n",
+            "required": true,
+            "type": "string",
+            "format": "date",
+            "minLength": 10,
+            "maxLength": 10
+          },
+          {
+            "in": "query",
+            "name": "date_to",
+            "description": "入出金取引明細範囲指定終了日付  \n照会方式がオンライン方式の場合、返却できる明細は1年分とする。  \n照会方式がオフライン方式の場合は金融機関ごとに返却できる明細の期間が異なる。  \nただし、オンライン方式の場合は金融機関ホストの性能や電文量によりエラーとなる場合があるため、1ヵ月以上の期間は指定しないことを推奨する。\n",
+            "required": true,
+            "type": "string",
+            "format": "date",
+            "minLength": 10,
+            "maxLength": 10
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "account_id": {
+                  "type": "string",
+                  "example": "p-12345678-y-1234",
+                  "description": "口座識別子  \n",
+                  "x-nullable": false,
+                  "x-format": "英数字記号",
+                  "minLength": 7,
+                  "maxLength": 29
                 },
                 "currency_code": {
-                    "type": "string",
-                    "description": "[ISO 4217](http://en.wikipedia.org/wiki/ISO_4217) currency code."
+                  "type": "string",
+                  "example": "USD",
+                  "description": "通貨コード  \nISO4217で規定されているコードを設定する。\n",
+                  "x-nullable": false,
+                  "x-format": "英字",
+                  "minLength": 3,
+                  "maxLength": 3
                 },
-                "display_name": {
-                    "type": "string",
-                    "description": "Display name of product."
+                "base_date": {
+                  "type": "string",
+                  "format": "date",
+                  "example": "2015-01-01",
+                  "description": "基準日\n",
+                  "x-nullable": true,
+                  "minLength": 10,
+                  "maxLength": 10
                 },
-                "estimate": {
-                    "type": "string",
-                    "description": "Formatted string of estimate in local currency of the start location. Estimate could be a range, a single number (flat rate) or \"Metered\" for TAXI."
+                "base_time": {
+                  "type": "string",
+                  "example": "12:20+09:00",
+                  "description": "基準時刻  \nhh:mm+09:00の形式で時刻を返却する。\n",
+                  "x-nullable": true,
+                  "x-format": "英数字記号",
+                  "minLength": 11,
+                  "maxLength": 11
                 },
-                "low_estimate": {
-                    "type": "number",
-                    "description": "Lower bound of the estimated price."
+                "has_next": {
+                  "type": "boolean",
+                  "example": false,
+                  "description": "継続情報  \n本APIでは一括で明細を返却するためfalseを返却する。\n",
+                  "enum": [
+                    false
+                  ],
+                  "x-nullable": false
                 },
-                "high_estimate": {
-                    "type": "number",
-                    "description": "Upper bound of the estimated price."
+                "tts": {
+                  "type": "number",
+                  "example": 105.85,
+                  "description": "預入適用レート  \n預入適用レート（TTS）を設定する。\n外貨口座以外の場合、Nullを設定する。\n",
+                  "x-nullable": true,
+                  "minLength": 1,
+                  "maxLength": 11
                 },
-                "surge_multiplier": {
-                    "type": "number",
-                    "description": "Expected surge multiplier. Surge is active if surge_multiplier is greater than 1. Price estimate already factors in the surge multiplier."
+                "ttb": {
+                  "type": "number",
+                  "example": 100.55,
+                  "description": "払出適用レート  \n払出適用レート(TTB)を設定する。  \n外貨口座以外の場合、Nullを設定する。\n",
+                  "x-nullable": true,
+                  "minLength": 1,
+                  "maxLength": 11
+                },
+                "rate_base_date": {
+                  "type": "string",
+                  "format": "date",
+                  "example": "2015-01-01",
+                  "description": "外貨レート基準日\nレートの設定日を設定する。\n外貨口座以外の場合、Nullを設定する。\n",
+                  "x-nullable": true,
+                  "minLength": 10,
+                  "maxLength": 10
+                },
+                "rate_base_time": {
+                  "type": "string",
+                  "example": "12:20+09:00",
+                  "description": "外貨レート基準時刻    \nレートの設定時刻をhh:mm+09:00の形式で時刻を返却する。  \n外貨口座以外の場合、Nullを設定する。\n",
+                  "x-nullable": true,
+                  "x-format": "英数字記号",
+                  "minLength": 11,
+                  "maxLength": 11
+                },
+                "count": {
+                  "type": "integer",
+                  "example": 10,
+                  "description": "明細件数  \n取得した明細件数を設定する。\n",
+                  "x-nullable": false,
+                  "minLength": 1,
+                  "maxLength": 4
+                },
+                "transactions": {
+                  "type": "array",
+                  "description": "入出金取引明細\n",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "transaction_id": {
+                        "type": "string",
+                        "example": "11100001",
+                        "description": "明細番号  \n",
+                        "x-nullable": true,
+                        "x-format": "数字",
+                        "minLength": 3,
+                        "maxLength": 8
+                      },
+                      "detail_division": {
+                        "type": "string",
+                        "example": "取消",
+                        "description": "明細区分(データ種別)  \n",
+                        "x-nullable": true,
+                        "x-format": "半角全角",
+                        "minLength": 1,
+                        "maxLength": 2
+                      },
+                      "transaction_date": {
+                        "type": "string",
+                        "format": "date",
+                        "example": "2017-05-30",
+                        "description": "取引日付  \n金融機関の設定により、「YYYY-MM-DD」「0000-MM-DD」「0000-00-DD」のいずれかの形式で値を返却する。\n",
+                        "x-nullable": true,
+                        "minLength": 10,
+                        "maxLength": 10
+                      },
+                      "initial_date_of_rockoning": {
+                        "type": "string",
+                        "format": "date",
+                        "example": "2017-06-30",
+                        "description": "起算日  \n取引日付と一致する場合は省略する。  \n金融機関の設定により、「YYYY-MM-DD」「0000-MM-DD」「0000-00-DD」のいずれかの形式で値を返却する。\n",
+                        "x-nullable": true,
+                        "minLength": 10,
+                        "maxLength": 10
+                      },
+                      "transaction_detail": {
+                        "type": "string",
+                        "example": "預入",
+                        "description": "取引内容  \n",
+                        "x-nullable": true,
+                        "x-format": "半角全角",
+                        "minLength": 1,
+                        "maxLength": 4
+                      },
+                      "transaction_type": {
+                        "type": "string",
+                        "example": "payin",
+                        "description": "入払区分  \n入出金の種別を設定する。payin=入金 payout=出金\n",
+                        "enum": [
+                          "payin",
+                          "payout"
+                        ],
+                        "x-nullable": true
+                      },
+                      "amount": {
+                        "type": "number",
+                        "example": 10000,
+                        "description": "取引金額  \n",
+                        "x-nullable": true,
+                        "minLength": 1,
+                        "maxLength": 20
+                      },
+                      "check_division": {
+                        "type": "string",
+                        "example": "振替支払",
+                        "description": "小切手区分  \n",
+                        "x-nullable": true,
+                        "x-format": "半角全角",
+                        "minLength": 1,
+                        "maxLength": 4
+                      },
+                      "transaction_balance": {
+                        "type": "number",
+                        "example": 1000000,
+                        "description": "取引後残高\n",
+                        "x-nullable": true,
+                        "minLength": 1,
+                        "maxLength": 20
+                      },
+                      "exchange_rate": {
+                        "type": "number",
+                        "example": 101.85,
+                        "description": "適用相場  \n対象口座が外貨口座の場合、適用相場を設定する。  \n外貨口座以外の場合、Nullを設定する。\n",
+                        "x-nullable": true,
+                        "minLength": 1,
+                        "maxLength": 11
+                      },
+                      "operation": {
+                        "type": "string",
+                        "example": "円から外貨",
+                        "description": "取扱\n対象口座が外貨口座の場合、取扱を設定する。  \n外貨口座以外の場合、Nullを設定する。\n",
+                        "x-nullable": true,
+                        "x-format": "半角全角",
+                        "minLength": 1,
+                        "maxLength": 30
+                      },
+                      "abstract": {
+                        "type": "string",
+                        "example": "水道料金",
+                        "description": "摘要内容\n",
+                        "x-nullable": true,
+                        "x-format": "半角全角",
+                        "minLength": 1,
+                        "maxLength": 48
+                      },
+                      "customer_id": {
+                        "type": "string",
+                        "example": "1111111111",
+                        "description": "需要家番号\n",
+                        "x-nullable": true,
+                        "x-format": "数字",
+                        "minLength": 20,
+                        "maxLength": 20
+                      }
+                    }
+                  }
                 }
+              }
             }
-        },
-        "Error": {
-            "type": "object",
-            "properties": {
-                "code": {
-                    "type": "integer",
-                    "format": "int32"
-                },
-                "message": {
-                    "type": "string"
-                },
-                "fields": {
-                    "type": "string"
-                }
-            }
+          },
+          "400": {
+            "$ref": "#/responses/BusinessAPIBusinessErrorResponse"
+          },
+          "401": {
+            "$ref": "#/responses/BusinessAPITokenErrorResponse"
+          },
+          "403": {
+            "$ref": "#/responses/BusinessAPITokenErrorResponse"
+          },
+          "404": {
+            "$ref": "#/responses/BusinessAPIBusinessErrorResponse"
+          },
+          "500": {
+            "$ref": "#/responses/BusinessAPIBusinessErrorResponse"
+          }
         }
+      }
+    },
+    "/banks/{bank_code}/accounts/{account_id}/term_deposits": {
+      "get": {
+        "tags": [
+          "accounts"
+        ],
+        "summary": "定期保有明細照会",
+        "description": "指定した口座の定期保有明細を照会する。",
+        "produces": [
+          "application/json",
+          "application/problem+json"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/parameters/AuthorizationHeaderBearer"
+          },
+          {
+            "$ref": "#/parameters/BankCodePath"
+          },
+          {
+            "$ref": "#/parameters/AccountIdPath"
+          },
+          {
+            "$ref": "#/parameters/AutoManualModeQuery"
+          },
+          {
+            "in": "query",
+            "name": "transaction_id_from",
+            "description": "預入開始番号  \n全明細預入開始番号から全明細預入終了番号の範囲内で、明細の取得を開始する預入番号を設定する。  \n本パラメータを設定しない場合は、全明細を照会する。\n",
+            "required": false,
+            "type": "string",
+            "x-format": "数字",
+            "minLength": 1,
+            "maxLength": 12
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "account_id": {
+                  "type": "string",
+                  "example": "p-12345678-y-1234",
+                  "description": "口座識別子  \n",
+                  "x-nullable": false,
+                  "x-format": "英数字記号",
+                  "minLength": 7,
+                  "maxLength": 29
+                },
+                "currency_code": {
+                  "type": "string",
+                  "example": "USD",
+                  "description": "通貨コード  \nISO4217で規定されているコードを設定する。\n",
+                  "x-nullable": false,
+                  "x-format": "英字",
+                  "minLength": 3,
+                  "maxLength": 3
+                },
+                "base_date": {
+                  "type": "string",
+                  "format": "date",
+                  "example": "2015-01-01",
+                  "description": "基準日\n",
+                  "x-nullable": true,
+                  "minLength": 10,
+                  "maxLength": 10
+                },
+                "base_time": {
+                  "type": "string",
+                  "example": "12:20+09:00",
+                  "description": "基準時刻  \nhh:mm+09:00の形式で時刻を返却する。\n",
+                  "x-nullable": true,
+                  "x-format": "英数字記号",
+                  "minLength": 11,
+                  "maxLength": 11
+                },
+                "has_next": {
+                  "type": "boolean",
+                  "example": false,
+                  "description": "継続情報  \n本APIでは一括で明細を返却するためfalseを返却する。\n",
+                  "enum": [
+                    "false"
+                  ],
+                  "x-nullable": false
+                },
+                "tts": {
+                  "type": "number",
+                  "example": 105.85,
+                  "description": "預入適用レート  \n預入適用レート（TTS）を設定する。\n外貨口座以外の場合、Nullを設定する。\n",
+                  "x-nullable": true,
+                  "minLength": 1,
+                  "maxLength": 11
+                },
+                "ttb": {
+                  "type": "number",
+                  "example": 100.55,
+                  "description": "払出適用レート  \n払出適用レート(TTB)を設定する。  \n外貨口座以外の場合、Nullを設定する。\n",
+                  "x-nullable": true,
+                  "minLength": 1,
+                  "maxLength": 11
+                },
+                "rate_base_date": {
+                  "type": "string",
+                  "format": "date",
+                  "example": "2015-01-01",
+                  "description": "外貨レート基準日\nレートの設定日を設定する。\n外貨口座以外の場合、Nullを設定する。\n",
+                  "x-nullable": true,
+                  "minLength": 10,
+                  "maxLength": 10
+                },
+                "rate_base_time": {
+                  "type": "string",
+                  "example": "12:20+09:00",
+                  "description": "外貨レート基準時刻    \nレートの設定時刻をhh:mm+09:00の形式で時刻を返却する。  \n外貨口座以外の場合、Nullを設定する。\n",
+                  "x-nullable": true,
+                  "x-format": "英数字記号",
+                  "minLength": 11,
+                  "maxLength": 11
+                },
+                "start_transaction_id": {
+                  "type": "string",
+                  "example": 10,
+                  "description": "全明細預入開始番号  \n照会可能な全明細の中で最小の預入番号を設定する。  \n",
+                  "x-nullable": true,
+                  "x-format": "数字",
+                  "minLength": 1,
+                  "maxLength": 12
+                },
+                "end_transaction_id": {
+                  "type": "string",
+                  "example": 10,
+                  "description": "全明細預入終了番号  \n照会可能な全明細の中で最大の預入番号を設定する。  \n",
+                  "x-nullable": true,
+                  "x-format": "数字",
+                  "minLength": 1,
+                  "maxLength": 12
+                },
+                "total_number_of_deposits": {
+                  "type": "integer",
+                  "example": 10,
+                  "description": "全明細件数  \n照会可能な明細件数を設定する。  \n",
+                  "x-nullable": true,
+                  "minLength": 1,
+                  "maxLength": 12
+                },
+                "count": {
+                  "type": "integer",
+                  "example": 10,
+                  "description": "明細件数  \n取得した明細件数を設定する。\n",
+                  "x-nullable": false,
+                  "minLength": 1,
+                  "maxLength": 4
+                },
+                "deposits": {
+                  "type": "array",
+                  "description": "定期商品保有明細\n",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "deposit_id": {
+                        "type": "string",
+                        "example": "001",
+                        "description": "預入番号  \n",
+                        "x-nullable": true,
+                        "x-format": "数字",
+                        "minLength": 1,
+                        "maxLength": 27
+                      },
+                      "product_name": {
+                        "type": "string",
+                        "example": "スーパー外貨定期",
+                        "description": "定期商品名  \n",
+                        "x-nullable": true,
+                        "x-format": "半角全角",
+                        "minLength": 1,
+                        "maxLength": 40
+                      },
+                      "deposit_term": {
+                        "type": "string",
+                        "example": "3年",
+                        "description": "預入期間  \n",
+                        "x-nullable": true,
+                        "x-format": "半角全角",
+                        "minLength": 1,
+                        "maxLength": 40
+                      },
+                      "interest_rate": {
+                        "type": "number",
+                        "example": 0.5,
+                        "description": "利率  \n",
+                        "x-nullable": true,
+                        "minLength": 1,
+                        "maxLength": 8
+                      },
+                      "cancel_accept": {
+                        "type": "boolean",
+                        "example": false,
+                        "description": "解約受付可否  \n",
+                        "enum": [
+                          "true",
+                          "false"
+                        ],
+                        "x-nullable": true
+                      },
+                      "maturity_cancel_accept": {
+                        "type": "boolean",
+                        "example": false,
+                        "description": "満期解約予約受付可否  \n",
+                        "enum": [
+                          "true",
+                          "false"
+                        ],
+                        "x-nullable": true
+                      },
+                      "condition_change_accept": {
+                        "type": "boolean",
+                        "example": false,
+                        "description": "満期時取扱条件変更受付可否  \n",
+                        "enum": [
+                          "true",
+                          "false"
+                        ],
+                        "x-nullable": true
+                      },
+                      "deposit_date": {
+                        "type": "string",
+                        "format": "date",
+                        "example": "2017-01-01",
+                        "description": "預入日  \n",
+                        "x-nullable": true,
+                        "minLength": 10,
+                        "maxLength": 10
+                      },
+                      "maturity_date": {
+                        "type": "string",
+                        "format": "date",
+                        "example": "2020-01-01",
+                        "description": "満期日  \n",
+                        "x-nullable": true,
+                        "minLength": 10,
+                        "maxLength": 10
+                      },
+                      "handling_at_maturity": {
+                        "type": "string",
+                        "example": "元利継続",
+                        "description": "満期時取扱内容  \n",
+                        "x-nullable": true,
+                        "x-format": "半角全角",
+                        "minLength": 1,
+                        "maxLength": 40
+                      },
+                      "deposit_amount": {
+                        "type": "number",
+                        "example": 123456,
+                        "description": "預入金額  \n",
+                        "x-nullable": true,
+                        "minLength": 1,
+                        "maxLength": 20
+                      },
+                      "abstract1": {
+                        "type": "string",
+                        "example": "XXX",
+                        "description": "摘要１  \n",
+                        "x-nullable": true,
+                        "x-format": "半角全角",
+                        "minLength": 1,
+                        "maxLength": 48
+                      },
+                      "abstract2": {
+                        "type": "string",
+                        "example": "XXX",
+                        "description": "摘要２\n取得対象が外貨口座の場合、摘要を設定する。  \n外貨口座以外の場合、Nullを設定する。\n",
+                        "x-nullable": true,
+                        "x-format": "半角全角",
+                        "minLength": 1,
+                        "maxLength": 48
+                      },
+                      "abstract3": {
+                        "type": "string",
+                        "example": "XXX",
+                        "description": "摘要３  \n取得対象が外貨口座の場合、摘要を設定する。  \n外貨口座以外の場合、Nullを設定する。\n",
+                        "x-nullable": true,
+                        "x-format": "半角全角",
+                        "minLength": 1,
+                        "maxLength": 48
+                      },
+                      "original_deposit_id": {
+                        "type": "string",
+                        "example": "001",
+                        "description": "当初預入番号  \n取得対象が外貨口座の場合、取引した当初の取引番号を設定する。  \n外貨口座以外の場合、Nullを設定する。\n",
+                        "x-nullable": true,
+                        "x-format": "数字",
+                        "minLength": 1,
+                        "maxLength": 27
+                      },
+                      "original_deposit_date": {
+                        "type": "string",
+                        "format": "date",
+                        "example": "2014-01-01",
+                        "description": "当初預入日  \n取得対象が外貨口座の場合、初回取引の発生日付を設定する。  \n外貨口座以外の場合、Nullを設定する。\n",
+                        "x-nullable": true,
+                        "minLength": 10,
+                        "maxLength": 10
+                      },
+                      "original_desposit_term": {
+                        "type": "string",
+                        "example": "3年",
+                        "description": "当初預入期間  \n取得対象が外貨口座の場合、取引した当初の預入期間を設定する。  \n外貨口座以外の場合、Nullを設定する。\n",
+                        "x-nullable": true,
+                        "x-format": "半角全角",
+                        "minLength": 1,
+                        "maxLength": 30
+                      },
+                      "original_desposit_amount": {
+                        "type": "number",
+                        "example": 123.45,
+                        "description": "当初預入金額\n取得対象が外貨口座の場合、取引した当初の取引金額を設定する。  \n外貨口座以外の場合、Nullを設定する。\n",
+                        "x-nullable": true,
+                        "minLength": 1,
+                        "maxLength": 20
+                      },
+                      "original_exchange_rate": {
+                        "type": "number",
+                        "example": 0.06,
+                        "description": "当初適用相場  \n取得対象が外貨口座の場合、取引した当初の適用相場を設定する。  \n外貨口座以外の場合、Nullを設定する。\n",
+                        "x-nullable": true,
+                        "minLength": 1,
+                        "maxLength": 11
+                      },
+                      "interest_before_tax": {
+                        "type": "number",
+                        "example": 123456,
+                        "description": "満期時税引前利息  \n取得対象が外貨口座の場合、満期時税引前利息を設定する。  \n外貨口座以外の場合、Nullを設定する。\n",
+                        "x-nullable": true,
+                        "minLength": 1,
+                        "maxLength": 20
+                      },
+                      "interest_after_tax": {
+                        "type": "number",
+                        "example": 123456,
+                        "description": "満期時税引後利息  \n取得対象が外貨口座の場合、満期時税引後利息を設定する。  \n外貨口座以外の場合、Nullを設定する。\n",
+                        "x-nullable": true,
+                        "minLength": 1,
+                        "maxLength": 20
+                      },
+                      "principal_and_interest": {
+                        "type": "number",
+                        "example": 123456,
+                        "description": "満期時元利金合計  \n取得対象が外貨口座の場合、満期時元利金合計を設定する。  \n外貨口座以外の場合、Nullを設定する。\n",
+                        "x-nullable": true,
+                        "minLength": 1,
+                        "maxLength": 20
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/responses/BusinessAPIBusinessErrorResponse"
+          },
+          "401": {
+            "$ref": "#/responses/BusinessAPITokenErrorResponse"
+          },
+          "403": {
+            "$ref": "#/responses/BusinessAPITokenErrorResponse"
+          },
+          "404": {
+            "$ref": "#/responses/BusinessAPIBusinessErrorResponse"
+          },
+          "500": {
+            "$ref": "#/responses/BusinessAPIBusinessErrorResponse"
+          }
+        }
+      }
+    },
+    "/banks/{bank_code}/accounts/{account_id}/funds": {
+      "get": {
+        "tags": [
+          "accounts"
+        ],
+        "summary": "投信保有明細照会",
+        "description": "指定した口座の投信保有明細を照会する。",
+        "produces": [
+          "application/json",
+          "application/problem+json"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/parameters/AuthorizationHeaderBearer"
+          },
+          {
+            "$ref": "#/parameters/BankCodePath"
+          },
+          {
+            "$ref": "#/parameters/AccountIdPath"
+          },
+          {
+            "$ref": "#/parameters/AutoManualModeQuery"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "account_id": {
+                  "type": "string",
+                  "example": "p-12345678-i-1234",
+                  "description": "口座識別子  \n",
+                  "x-nullable": false,
+                  "x-format": "英数字記号",
+                  "minLength": 7,
+                  "maxLength": 29
+                },
+                "account_specificity_division": {
+                  "type": "string",
+                  "example": "general",
+                  "description": "特定口座区分  \n該当する口座が投信口座の場合、特定口座区分を設定する。  \ngeneral=一般 specific=特定  \n投信口座以外の場合、Nullを設定する。\n",
+                  "enum": [
+                    "general",
+                    "specific"
+                  ],
+                  "x-nullable": false
+                },
+                "withholding_tax_division": {
+                  "type": "string",
+                  "example": "none",
+                  "description": "源泉徴収区分  \n該当する口座が投信口座の場合、源泉徴収区分を設定する。  \nnone=源泉徴収選択なし includeDiviends=源泉徴収選択あり（配当通算あり） excludeDiviends=源泉徴収選択あり（配当通算なし）  \n投信口座以外の場合、Nullを設定する。\n",
+                  "enum": [
+                    "none",
+                    "includeDiviends",
+                    "excludeDiviends"
+                  ],
+                  "x-nullable": true
+                },
+                "base_date": {
+                  "type": "string",
+                  "format": "date",
+                  "example": "2015-01-01",
+                  "description": "基準日\n",
+                  "x-nullable": true,
+                  "minLength": 10,
+                  "maxLength": 10
+                },
+                "has_next": {
+                  "type": "boolean",
+                  "example": false,
+                  "description": "継続情報  \n本APIでは一括で明細を返却するためfalseを返却する。\n",
+                  "enum": [
+                    "false"
+                  ],
+                  "x-nullable": false
+                },
+                "count": {
+                  "type": "integer",
+                  "example": 10,
+                  "description": "明細件数  \n取得した明細件数を設定する。\n",
+                  "x-nullable": false,
+                  "minLength": 1,
+                  "maxLength": 4
+                },
+                "funds": {
+                  "type": "array",
+                  "description": "保管ファンド情報\n",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "fund_name": {
+                        "type": "string",
+                        "example": "ＡＮＳＥＲ新興国毎月決算型ファンド（分配金受取りコース）",
+                        "description": "ファンド名  \n",
+                        "x-nullable": true,
+                        "x-format": "半角全角",
+                        "minLength": 1,
+                        "maxLength": 128
+                      },
+                      "fund_id": {
+                        "type": "string",
+                        "example": "22000002",
+                        "description": "ファンドID  \n",
+                        "x-nullable": true,
+                        "x-format": "半角",
+                        "minLength": 8,
+                        "maxLength": 8
+                      },
+                      "kind_of_account": {
+                        "type": "string",
+                        "example": "general",
+                        "description": "預り区分  \ngeneral=一般 specific=特定 nisa=NISA\n",
+                        "enum": [
+                          "general",
+                          "specific",
+                          "nisa"
+                        ],
+                        "x-nullable": true
+                      },
+                      "types_of_earning": {
+                        "type": "string",
+                        "example": "continual",
+                        "description": "一般累投区分  \npayout=一般 reinvestment=累投\n",
+                        "enum": [
+                          "payout",
+                          "reinvestment"
+                        ],
+                        "x-nullable": true
+                      },
+                      "unit": {
+                        "type": "integer",
+                        "example": 327976,
+                        "description": "保有口数  \n",
+                        "x-nullable": true,
+                        "minLength": 1,
+                        "maxLength": 18
+                      },
+                      "unit_within_30days": {
+                        "type": "integer",
+                        "example": 1000,
+                        "description": "30日未満保有口数  \n保有口数のうち、30日未経過分を設定する。\n",
+                        "x-nullable": true,
+                        "minLength": 1,
+                        "maxLength": 18
+                      },
+                      "net_asset_value": {
+                        "type": "number",
+                        "example": 3619,
+                        "description": "基準価額  \n",
+                        "x-nullable": true,
+                        "minLength": 1,
+                        "maxLength": 8
+                      },
+                      "principal_per_unit": {
+                        "type": "number",
+                        "example": 3049,
+                        "description": "個別元本  \n",
+                        "x-nullable": true,
+                        "minLength": 1,
+                        "maxLength": 16
+                      },
+                      "value_at_cancellation": {
+                        "type": "number",
+                        "example": 10000,
+                        "description": "解約価額  \n",
+                        "x-nullable": true,
+                        "minLength": 1,
+                        "maxLength": 8
+                      },
+                      "purchase_price": {
+                        "type": "number",
+                        "example": 7108,
+                        "description": "取得金額／購入金額  \n",
+                        "x-nullable": true,
+                        "minLength": 1,
+                        "maxLength": 22
+                      },
+                      "price_per_unit": {
+                        "type": "number",
+                        "example": 10000,
+                        "description": "取得単価／購入単価  \n",
+                        "x-nullable": true,
+                        "minLength": 1,
+                        "maxLength": 22
+                      },
+                      "apprisal_value": {
+                        "type": "number",
+                        "example": 200000,
+                        "description": "評価金額  \n",
+                        "x-nullable": true,
+                        "minLength": 1,
+                        "maxLength": 18
+                      },
+                      "appraisal_profit_or_loss": {
+                        "type": "number",
+                        "example": 16594,
+                        "description": "評価損益  \n",
+                        "x-nullable": true,
+                        "minLength": 1,
+                        "maxLength": 18
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/responses/BusinessAPIBusinessErrorResponse"
+          },
+          "401": {
+            "$ref": "#/responses/BusinessAPITokenErrorResponse"
+          },
+          "403": {
+            "$ref": "#/responses/BusinessAPITokenErrorResponse"
+          },
+          "404": {
+            "$ref": "#/responses/BusinessAPIBusinessErrorResponse"
+          },
+          "500": {
+            "$ref": "#/responses/BusinessAPIBusinessErrorResponse"
+          }
+        }
+      }
+    },
+    "/banks/{bank_code}/personal_transfers/submittions": {
+      "post": {
+        "tags": [
+          "personal_transfers"
+        ],
+        "summary": "振替実行",
+        "description": "指定した口座へ振替を行う。",
+        "consumes": [
+          "application/json"
+        ],
+        "produces": [
+          "application/json",
+          "application/problem+json"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/parameters/AuthorizationHeaderBearer"
+          },
+          {
+            "$ref": "#/parameters/BankCodePath"
+          },
+          {
+            "in": "body",
+            "name": "request_body",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "required": [
+                "account_id",
+                "auto_manual_mode",
+                "remote_branch_code",
+                "remote_account_type_code",
+                "remote_account_number",
+                "transfer_amount"
+              ],
+              "properties": {
+                "account_id": {
+                  "description": "口座識別子  \n口座一覧照会で取得した口座識別子を設定する。\n",
+                  "type": "string",
+                  "x-format": "英数字記号",
+                  "minLength": 7,
+                  "maxLength": 29
+                },
+                "auto_manual_mode": {
+                  "description": "自動手動モード  \nauto=自動 manual=手動  \n利用者操作契機による要求には「手動」、それ以外の契機の場合は「自動」を設定する。  \n",
+                  "type": "string",
+                  "enum": [
+                    "auto",
+                    "manual"
+                  ]
+                },
+                "remote_branch_code": {
+                  "description": "振替先支店コード  \n",
+                  "type": "string",
+                  "x-format": "数字",
+                  "minLength": 3,
+                  "maxLength": 3
+                },
+                "remote_account_type_code": {
+                  "description": "振替先科目コード  \n",
+                  "type": "string",
+                  "x-format": "数字",
+                  "minLength": 1,
+                  "maxLength": 1
+                },
+                "remote_account_number": {
+                  "description": "振替先口座番号  \n",
+                  "type": "string",
+                  "x-format": "数字",
+                  "minLength": 1,
+                  "maxLength": 7
+                },
+                "transfer_amount": {
+                  "description": "振替金額  \n",
+                  "type": "number",
+                  "x-format": "数字",
+                  "minLength": 1,
+                  "maxLength": 11
+                }
+              }
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "transaction_id": {
+                  "type": "string",
+                  "example": "1231001",
+                  "description": "受付番号  \n",
+                  "x-nullable": false,
+                  "x-format": "数字",
+                  "minLength": 7,
+                  "maxLength": 7
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/responses/BusinessAPIBusinessErrorResponse"
+          },
+          "401": {
+            "$ref": "#/responses/BusinessAPITokenErrorResponse"
+          },
+          "403": {
+            "$ref": "#/responses/BusinessAPITokenErrorResponse"
+          },
+          "404": {
+            "$ref": "#/responses/BusinessAPIBusinessErrorResponse"
+          },
+          "500": {
+            "$ref": "#/responses/BusinessAPIBusinessErrorResponse"
+          }
+        }
+      }
     }
+  },
+  "parameters": {
+    "AuthorizationHeaderBasic": {
+      "in": "header",
+      "name": "Authorization",
+      "description": "クライアント識別子・パスワード  \nBasic認証  \nクライアント識別子とクライアントパスワードをBASE64でエンコードした値を設定する。  \n",
+      "required": true,
+      "type": "string",
+      "x-format": "英数字"
+    },
+    "AuthorizationHeaderBearer": {
+      "in": "header",
+      "name": "Authorization",
+      "description": "アクセストークン  \nアクセストークンをBearer認証の形で設定する。\n",
+      "required": true,
+      "type": "string",
+      "x-format": "英数字"
+    },
+    "BankCodePath": {
+      "in": "path",
+      "name": "bank_code",
+      "description": "金融機関コード  \n",
+      "required": true,
+      "type": "string",
+      "x-format": "数字",
+      "minLength": 4,
+      "maxLength": 4
+    },
+    "AccountIdPath": {
+      "in": "path",
+      "name": "account_id",
+      "description": "口座識別子  \n/accountsで取得した口座識別子を設定する。\n",
+      "required": true,
+      "type": "string",
+      "x-format": "英数字記号",
+      "minLength": 7,
+      "maxLength": 29
+    },
+    "AutoManualModeQuery": {
+      "in": "query",
+      "name": "auto_manual_mode",
+      "description": "自動手動モード  \nauto=自動 manual=手動  \n利用者操作契機による要求には「手動」、それ以外の契機の場合は「自動」を設定する。 \n",
+      "required": true,
+      "type": "string",
+      "enum": [
+        "auto",
+        "manual"
+      ]
+    }
+  },
+  "responses": {
+    "OAuthAPIErrorResponse": {
+      "description": "OAuth接続API エラー",
+      "schema": {
+        "$ref": "#/definitions/RFC6749ErrorResponse"
+      }
+    },
+    "OAuthAPIErrorWithWWWAuthenticateHeaderResponse": {
+      "description": "OAuth接続API エラー(WWW-Authenticateヘッダあり)",
+      "headers": {
+        "WWW-Authenticate": {
+          "description": "Basic認証やBearer認証でエラーとなった際に設定される。realmはParaSOL-APIのルートが設定される。  \nBearer realm=\"example\",error=\"invalid_token\",error_description=\"access token has expired.\"'\n",
+          "type": "string"
+        }
+      },
+      "schema": {
+        "$ref": "#/definitions/RFC6749ErrorResponse"
+      }
+    },
+    "BusinessAPITokenErrorResponse": {
+      "description": "業務API アクセストークンエラー",
+      "headers": {
+        "WWW-Authenticate": {
+          "description": "Basic認証やBearer認証でエラーとなった際に設定される。realmはParaSOL-APIのルートが設定される。  \nBearer realm=\"example\",error=\"invalid_token\",error_description=\"access token has expired.\"'\n",
+          "type": "string"
+        }
+      },
+      "schema": {
+        "$ref": "#/definitions/RFC7807ErrorResponse"
+      }
+    },
+    "BusinessAPIBusinessErrorResponse": {
+      "description": "業務API 業務エラー",
+      "schema": {
+        "$ref": "#/definitions/RFC7807ErrorResponse"
+      }
+    }
+  },
+  "definitions": {
+    "RFC6749ErrorResponse": {
+      "type": "object",
+      "properties": {
+        "error": {
+          "type": "string",
+          "example": "invalid_request",
+          "description": "エラーコード"
+        },
+        "error_description": {
+          "type": "string",
+          "example": "invalid parameters requested.",
+          "description": "エラーメッセージ"
+        }
+      }
+    },
+    "RFC7807ErrorResponse": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "type": "string",
+          "example": "about:blank",
+          "description": "about:blank"
+        },
+        "title": {
+          "type": "string",
+          "example": "invalid_request",
+          "description": "エラーコード"
+        },
+        "detail": {
+          "type": "string",
+          "example": "invalid parameters requested.",
+          "description": "エラーメッセージ"
+        }
+      }
+    }
+  }
 }
