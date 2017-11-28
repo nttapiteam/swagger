@@ -3,7 +3,10 @@
   "info": {
     "version": "1.0",
     "title": "AnserParaSOL API(v1)",
-    "description": "本サービスでは、金融機関の設定や利用者の利用状況によって特定の項目の返却値が存在しない場合がある。  \n返却値が存在しない場合、一律Nullを返却する。  \nただし、口座一覧照会、口座情報照会の_links配下の項目は返却値が存在しない場合、項目ごと削除とする。\nx-logo:\nurl: 'https://rebilly.github.io/ReDoc/petstore-logo.png'\n"
+    "description": "本サービスでは、金融機関の設定や利用者の利用状況によって特定の項目の返却値が存在しない場合がある。  \n返却値が存在しない場合、一律Nullを返却する。  \nただし、口座一覧照会、口座情報照会の_links配下の項目は返却値が存在しない場合、項目ごと削除とする。\n"
+  },
+  "x-logo": {
+    "url": "https://rebilly.github.io/ReDoc/petstore-logo.png"
   },
   "basePath": "/parasol/v1",
   "schemes": [
